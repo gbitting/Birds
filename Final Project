@@ -1,5 +1,6 @@
 import pandas as pd
-
+import math as m
+import numpy as np
 # 1
 data = pd.read_csv("bird_jan25jan16.txt", sep=r"\s+", engine = 'python', parse_dates=[[0, 1]], names = ['date', 'time', 'count'])
 birds = pd.DataFrame(data)
@@ -12,3 +13,30 @@ birds['date_time'] = birds['date_time'].dt.tz_convert('Europe/Stockholm')
 
 birds = birds.set_index('date_time')
 birds.head()
+
+
+# 3
+
+
+
+# 4
+
+start_date = input("Enter start date: ")
+days = int(input("Enter number of days: "))
+intervals = input('Enter inerval between readings (write the value and then the unit of the time division seperated by a space): ')
+intervals = intervals.split()
+f = open("birds_data.csv")
+line, = f.readline().split("    ")#replace with, if a proper csv file is used
+difference = pd.to_datetime(start_date) - pd.to_datetime(line) 
+day_diff = difference.days
+sec_diff = (difference - day_diff).seconds
+freq = m.ceil(pd.Timedelta(int(intervals[0], unit = intervals[1])).seconds/120)
+first_index = 720*day_diff-sec_diff//120
+index_list = [item for item in range(first_index,1440*days + first_index) if item not in range(first_index,1440*days + first_index , step = freq)]
+try:
+    
+    db = pd.read_csv(f, chunksize = 1440*days + first_index,  skiprows =  lambda x: x in [range(first_index)] + index_list)    
+except:
+    print("Please enter correct dates and intervals.")
+    
+
