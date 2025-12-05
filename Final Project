@@ -11,4 +11,3 @@ birds['date_time'] = birds['date_time'].dt.tz_localize('UTC')
 birds['date_time'] = birds['date_time'].dt.tz_convert('Europe/Stockholm')
 
 birds = birds.set_index('date_time')
-birds.head()
