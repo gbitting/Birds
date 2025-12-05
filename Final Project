@@ -1,0 +1,14 @@
+import pandas as pd
+
+# 1
+data = pd.read_csv("bird_jan25jan16.txt", sep=r"\s+", engine = 'python', parse_dates=[[0, 1]], names = ['date', 'time', 'count'])
+birds = pd.DataFrame(data)
+
+birds['date_time'] = pd.to_datetime(birds['date_time'])
+
+# 2
+birds['date_time'] = birds['date_time'].dt.tz_localize('UTC')
+birds['date_time'] = birds['date_time'].dt.tz_convert('Europe/Stockholm')
+
+birds = birds.set_index('date_time')
+birds.head()
