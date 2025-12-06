@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # 1
 data = pd.read_csv("bird_jan25jan16.txt", sep=r"\s+", engine = 'python', parse_dates=[[0, 1]], names = ['date', 'time', 'count'])
