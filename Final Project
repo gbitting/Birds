@@ -14,56 +14,7 @@ birds['date_time'] = birds['date_time'].dt.tz_convert('Europe/Stockholm')
 birds = birds.set_index('date_time')
 
 # 3
-class preProcessing():                
-    @staticmethod
-    def missingLineFix(data):
-        """Fixes missing lines by adding line inbetween that is at half the time
-        of the current line and next consecutive line, and which has the avg
-        count between the current and next line."""
-        #Convert time to int. (Gives time in ns since 1970)
-        dataTS = data.index.astype("int64")
-        dataTS = dataTS.to_numpy()
-        #Store count in np array for speed. (This will be done for all preProc funcs)
-        dataVals = data.iloc[:, 0].to_numpy()
-        for n in range (len(dataVals)):
-            #Define variable to keep track of size of dataVals (and dataTS) as it increases
-            k=0
-            #Check if difference between current row and next is more than 2 min 30 sec
-            #arbitrarily.
-            if (dataTS[n+k+1] - dataTS[n+k])/10**9 > 150:
-                #Create variable to store time that will be added in new row
-                newTime = (dataTS[n+k]+dataTS[n+k+1])/2
-                #Create new value that will be stored in row.
-                newValue = np.ceil((dataVals[n+k+1] + dataVals[n+k])/2)
-                #Add new time and values
-                dataTS = np.insert(dataTS, n+k+1, newTime)
-                dataVals = np.insert(dataVals, n+k+1, newValue)
-                k+=1
-        #Resize dataframe to fit in new size collumns.
-        data = pd.concat([data, pd.DataFrame([{}]*(len(dataVals)-len(data.index)))], ignore_index=True)
-        #Update count collumn
-        data["count"] = dataVals
-        #Translate dataTS into timestamps in our region
-        dataTS = pd.to_datetime(dataTS)
-        dataTS=dataTS.tz_localize('UTC')
-        dataTS=dataTS.tz_convert('Europe/Stockholm')
-        #Update time collumn
-        data.index = (dataTS)
-        return data
-    
-    @staticmethod
-    def flutterErrorFix(data):
-        """Deals with error from birds fluttering by the box by
-        limiting counts to approx 8 per 2 minute."""
-        dataVals = data.iloc[:, 0].to_numpy()
-        for n in range(len(dataVals)-1):
-            #Check for more than 8 counts in less than 2 min
-            if(dataVals[n+1]-dataVals[n] > 8):
-                #Add offset to take care of extra counts and add in 8
-                #counts for all elements of index n+1 or higher.
-                dataVals[n+1:]+=-(dataVals[n+1]-dataVals[n])+8
-        data["count"] = dataVals
-        return data
+class preProcessing():     
 
     @staticmethod
     def incompleteCountFix(data):
@@ -105,14 +56,83 @@ class preProcessing():
         """Deals with count resets by adding the number before the reset to
         all the following numbers."""
         dataVals = data.iloc[:, 0].to_numpy()
-        for n in range(1, len(dataVals)-2):
-            #Check if next and next next value is smaller than current
-            #if so => reset
-            if(dataVals[-n-2]>dataVals[-n-1] and dataVals[-n-2]>dataVals[-n]):
-                #Add the count before the reset to all of the elements after
-                #the reset
+        for n in range(1, len(dataVals)-1):
+            #Check if a value is 0 if so => reset
+            #if value previous also 0 then adding it does nothing
+            if(dataVals[-n-1]==0):
+                #Add the previous count to all of the elements after
                 dataVals[-n-1:] +=dataVals[-n-2]
         data["count"] = dataVals
+        return data
+    
+    @staticmethod
+    def orderFix(data):
+        """Fixes the order of the dates. Some dates are out of order."""
+        #Convert time to int. (Gives time in ns since 1970)
+        dataTS = data.index.astype("int64")
+        dataTS = dataTS.to_numpy()
+        #Store count in np array for speed. (This will be done for all preProc funcs)
+        dataVals = data.iloc[:, 0].to_numpy()
+        #Sort both arrays from least to most.
+        dataTS = np.sort(dataTS)
+        dataVals = np.sort(dataVals)
+        #Update count collumn
+        data["count"] = dataVals
+        #Translate dataTS into timestamps in our region
+        dataTS = pd.to_datetime(dataTS)
+        dataTS=dataTS.tz_localize('UTC')
+        dataTS=dataTS.tz_convert('Europe/Stockholm')
+        #Update time collumn
+        data.index = (dataTS)
+        return data
+    
+    @staticmethod
+    def flutterErrorFix(data):
+        """Deals with error from birds fluttering by the box by
+        limiting counts to approx 8 per 2 minute."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        for n in range(len(dataVals)-1):
+            #Check for more than 8 counts in less than 2 min
+            if(dataVals[n+1]-dataVals[n] > 8):
+                #Add offset to take care of extra counts and add in 8
+                #counts for all elements of index n+1 or higher.
+                dataVals[n+1:]+=-(dataVals[n+1]-dataVals[n])+8
+        data["count"] = dataVals
+        return data
+    
+    @staticmethod
+    def missingLineFix(data):
+        """Fixes missing lines by adding line inbetween that is at half the time
+        of the current line and next consecutive line, and which has the avg
+        count between the current and next line."""
+        #Convert time to int. (Gives time in ns since 1970)
+        dataTS = data.index.astype("int64")
+        dataTS = dataTS.to_numpy()
+        dataVals = data.iloc[:, 0].to_numpy()
+        for n in range (len(dataVals)):
+            #Define variable to keep track of size of dataVals (and dataTS) as it increases
+            k=0
+            #Check if difference between current row and next is more than 2 min 30 sec
+            #arbitrarily.
+            if (dataTS[n+k+1] - dataTS[n+k])/10**9 > 150:
+                #Create variable to store time that will be added in new row
+                newTime = (dataTS[n+k]+dataTS[n+k+1])/2
+                #Create new value that will be stored in row.
+                newValue = np.ceil((dataVals[n+k+1] + dataVals[n+k])/2)
+                #Add new time and values
+                dataTS = np.insert(dataTS, n+k+1, newTime)
+                dataVals = np.insert(dataVals, n+k+1, newValue)
+                #Increase index k                k+=1
+        #Resize dataframe to fit in new size collumns.
+        data = pd.concat([data, pd.DataFrame([{}]*(len(dataVals)-len(data.index)))], ignore_index=True)
+        #Update count collumn
+        data["count"] = dataVals
+        #Translate dataTS into timestamps in our region
+        dataTS = pd.to_datetime(dataTS)
+        dataTS=dataTS.tz_localize('UTC')
+        dataTS=dataTS.tz_convert('Europe/Stockholm')
+        #Update time collumn
+        data.index = (dataTS)
         return data
             
     @staticmethod
@@ -126,6 +146,7 @@ class preProcessing():
         #neighbors. If resets are fixed first this is not the case
         data=preProcessing.incompleteCountFix(data)
         data=preProcessing.resetFix(data)
+        data=preProcessing.orderFix(data)
         data=preProcessing.flutterErrorFix(data)
         data=preProcessing.missingLineFix(data)
         return data
