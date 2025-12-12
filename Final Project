@@ -137,7 +137,7 @@ class preProcessing():
             
     @staticmethod
     def process(data):
-        """Calls all functions related to preProcessing for the document.
+        """Calls all functions related to preProcessing for the document and outputs result in a csv file.
         Do not change the order of the calls. Preprocessing may break as
         a result."""
         #IncompleteCountFix should always be called first
@@ -149,6 +149,7 @@ class preProcessing():
         data=preProcessing.orderFix(data)
         data=preProcessing.flutterErrorFix(data)
         data=preProcessing.missingLineFix(data)
+        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
         return data
 
 birds = preProcessing.process(birds)
