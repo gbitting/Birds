@@ -21,22 +21,30 @@ birds.head()
 
 # 4
 
-start_date = input("Enter start date: ")
-days = int(input("Enter number of days: "))
-intervals = input('Enter inerval between readings (write the value and then the unit of the time division seperated by a space): ')
-intervals = intervals.split()
-f = open("birds_data.csv")
-line, = f.readline().split("    ")#replace with, if a proper csv file is used
-difference = pd.to_datetime(start_date) - pd.to_datetime(line) 
-day_diff = difference.days
-sec_diff = (difference - day_diff).seconds
-freq = m.ceil(pd.Timedelta(int(intervals[0], unit = intervals[1])).seconds/120)
-first_index = 720*day_diff-sec_diff//120
-index_list = [item for item in range(first_index,1440*days + first_index) if item not in range(first_index,1440*days + first_index , step = freq)]
-try:
-    
-    db = pd.read_csv(f, chunksize = 1440*days + first_index,  skiprows =  lambda x: x in [range(first_index)] + index_list)    
-except:
-    print("Please enter correct dates and intervals.")
-    
+df = pd.read_csv('ProcessedBirdData.csv', sep="\t", names=["date_time", "count"], index_col = False)
 
+#df =  df.iloc[1:].reset_index(drop = True)
+
+df["date_time"] = pd.to_datetime(df["date_time"], format = "mixed")
+df["count"] = pd.to_numeric(df["count"])
+start_date = pd.to_datetime(input("Enter start date: ")).tz_localize("Europe/Stockholm")
+days = int(input("Enter number of days: "))
+interval = pd.Timedelta(input('Enter inerval between readings (write the value and then the unit of the time division seperated by a space): '))
+
+
+
+end_date = start_date + pd.Timedelta(days=days)
+
+df = df[
+    (df["date_time"] >= start_date) &
+    (df["date_time"] < end_date)
+]
+
+df["count"] = df["count"].diff()
+
+#resampling
+
+
+df = df.set_index("date_time")
+
+resampled_df = df.resample(interval).sum().reset_index()
