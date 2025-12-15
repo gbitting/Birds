@@ -157,7 +157,7 @@ class preProcessing():
         #flutterErrorFix should be called last as it uses differences between
         #consecutive counts.
         data=preProcessing.flutterErrorFix(data)
-        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
+        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8", header = False)
         return data
 
 
