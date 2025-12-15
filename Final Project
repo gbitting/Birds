@@ -102,7 +102,6 @@ class preProcessing():
             #Insert avg time and count value inbetween the 
             #two times which are more than 150 sec apart.
             for k in range(1, ((dataTS[n+i+1]-dataTS[n+i])//(150*10**9))+1):
-                print(n)
                 dataTS = np.insert(dataTS, n+i+1, dataTS[n+i]+avgTS)
                 dataVals = np.insert(dataVals, n+i+1, dataVals[n+i]+avgVal)
                 i+=1
