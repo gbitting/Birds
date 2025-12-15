@@ -86,20 +86,7 @@ class preProcessing():
         data.index = (dataTS)
         return data
     
-    @staticmethod
-    def flutterErrorFix(data):
-        """Deals with error from birds fluttering by the box by
-        limiting counts to approx 8 per 2 minute."""
-        dataVals = data.iloc[:, 0].to_numpy()
-        for n in range(len(dataVals)-1):
-            #Check for more than 8 counts in less than 2 min
-            if(dataVals[n+1]-dataVals[n] > 8):
-                #Add offset to take care of extra counts and add in 8
-                #counts for all elements of index n+1 or higher.
-                dataVals[n+1:]+=-(dataVals[n+1]-dataVals[n])+8
-        data["count"] = dataVals
-        return data
-    
+        
     @staticmethod
     def missingLineFix(data):
         """Fixes missing lines by adding line inbetween that is at half the time
@@ -133,6 +120,20 @@ class preProcessing():
         dataTS=dataTS.tz_convert('Europe/Stockholm')
         #Update time collumn
         data.index = (dataTS)
+        return data
+    
+    @staticmethod
+    def flutterErrorFix(data):
+        """Deals with error from birds fluttering by the box by
+        limiting counts to approx 8 per 2 minute."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        for n in range(len(dataVals)-1):
+            #Check for more than 8 counts in less than 2 min
+            if(dataVals[n+1]-dataVals[n] > 8):
+                #Add offset to take care of extra counts and add in 8
+                #counts for all elements of index n+1 or higher.
+                dataVals[n+1:]+=-(dataVals[n+1]-dataVals[n])+8
+        data["count"] = dataVals
         return data
             
     @staticmethod
