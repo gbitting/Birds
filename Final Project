@@ -17,37 +17,55 @@ birds = birds.set_index('date_time')
 class preProcessing():     
 
     @staticmethod
-    def incompleteCountFix(data):
-        """Deals with incomplete counts by adding the snipped off parts
-        back to the numbers."""
+    def doubleDateFix(data):
+        """Some dates are double and out of order. This function removes these dates."""
+        #Convert time to int. (Gives time in ns since 1970)
+        dataTS = data.index.astype("int64")
         dataVals = data.iloc[:, 0].to_numpy()
+        #New variable to offset dataTS and dataVals
+        k=0
+        #Check for dates out of place
+        for n in range(1, len(dataTS)-1):
+            if dataTS[n-k] < dataTS[n-k-1] or dataTS[n-k]>dataTS[n-k+1]:
+                #Remove out of place dates and their counts.
+                dataTS = np.delete(dataTS, n-k)
+                dataVals = np.delete(dataVals, n-k)
+                k+=1
+        #Convert dataTS back to datetime
+        dataTS = pd.to_datetime(dataTS)
+        dataTS=dataTS.tz_localize('UTC')
+        dataTS=dataTS.tz_convert('Europe/Stockholm')
+        #Create new pandas dataframe with new collumns.
+        data = pd.DataFrame(data={'count':dataVals, 'date_time':dataTS})
+        data = data.set_index('date_time')
+        return data    
+
+    @staticmethod
+    def incompleteCountFix(data):
+        """Deals with incomplete counts by replacing them with their full counterpart."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        #Convert dataVals numbers to string
+        dataVals = np.char.mod('%s', dataVals)
         for n in range(len(dataVals)-2):
-            #Check that current value doesn't equal to next
-            if(dataVals[n] != dataVals[n+1]):
-                #Check for case that dataVals[n+1]==0 because then its log
-                #is undefined.
-                if dataVals[n+1]==0:
-                    #The incomplete count is always the end of 
-                    #a complete number thus dataVals[n+2] or dataVals[n],
-                    #which has the complete number, is divisible by 10
-                    if dataVals[n] % 10 == 0:
-                        dataVals[n+1]=dataVals[n]
-                        continue
-                    if dataVals[n+2] %10 == 0:
-                        dataVals[n+1]=dataVals[n+2]
-                        continue
-                    #Otherwise it is a reset so continue
-                    else:
-                        continue
-                #Check that the end of the next value is equal to 
-                #the end of the current value (signifies incomplete count)
-                if dataVals[n]-(dataVals[n]//(10**np.floor(np.log10(dataVals[n+1])+1)))*10**np.floor(np.log10(dataVals[n+1])+1) == dataVals[n+1]:
+            if len(dataVals[n]) > len(dataVals[n+1]):
+                #Check if the number is equal to its neighbors end
+                if(dataVals[n][len(dataVals[n])-len(dataVals[n+1]):] == dataVals[n+1]):
                     dataVals[n+1]=dataVals[n]
-        #Check first and last numbers since for loop does not account for them.
-        if dataVals[0]==dataVals[1]-(dataVals[1]//(10**np.floor(np.log10(dataVals[0])+1)))*10**np.floor(np.log10(dataVals[0])+1):
-            dataVals[0]==dataVals[1]
-        if dataVals[-1]==dataVals[-2]-(dataVals[-2]//(10**np.floor(np.log10(dataVals[-1])+1)))*10**np.floor(np.log10(dataVals[-1])+1):
-            dataVals[-1]==dataVals[-2]    
+                    continue
+                if(dataVals[n+2][len(dataVals[n+2])-len(dataVals[n+1]):]==dataVals[n+1]):
+                    dataVals[n+1]=dataVals[n+2]
+                    continue
+                #Check if the number is equal to it's neighbors beginning
+                if dataVals[n+1] == dataVals[n][:len(dataVals[n+1])]:
+                    dataVals[n+1]=dataVals[n]
+                    continue
+                if dataVals[n+1] == dataVals[n+2][:len(dataVals[n+1])]:
+                    dataVals[n+1]=dataVals[n+2]
+                    continue
+                #If none of these are true then it must be a reset so continue.
+                else:
+                    continue
+        dataVals = dataVals.astype(int)
         data["count"] = dataVals
         return data
         
@@ -65,27 +83,6 @@ class preProcessing():
         data["count"] = dataVals
         return data
     
-    @staticmethod
-    def orderFix(data):
-        """Fixes the order of the dates. Some dates are out of order."""
-        #Convert time to int. (Gives time in ns since 1970)
-        dataTS = data.index.astype("int64")
-        dataTS = dataTS.to_numpy()
-        #Store count in np array for speed. (This will be done for all preProc funcs)
-        dataVals = data.iloc[:, 0].to_numpy()
-        #Sort both arrays from least to most.
-        dataTS = np.sort(dataTS)
-        dataVals = np.sort(dataVals)
-        #Update count collumn
-        data["count"] = dataVals
-        #Translate dataTS into timestamps in our region
-        dataTS = pd.to_datetime(dataTS)
-        dataTS=dataTS.tz_localize('UTC')
-        dataTS=dataTS.tz_convert('Europe/Stockholm')
-        #Update time collumn
-        data.index = (dataTS)
-        return data
-    
         
     @staticmethod
     def missingLineFix(data):
@@ -96,20 +93,20 @@ class preProcessing():
         dataTS = data.index.astype("int64")
         dataTS = dataTS.to_numpy()
         dataVals = data.iloc[:, 0].to_numpy()
-        for n in range (len(dataVals)):
-            #Define variable to keep track of size of dataVals (and dataTS) as it increases
-            k=0
-            #Check if difference between current row and next is more than 2 min 30 sec
-            #arbitrarily.
-            if (dataTS[n+k+1] - dataTS[n+k])/10**9 > 150:
-                #Create variable to store time that will be added in new row
-                newTime = (dataTS[n+k]+dataTS[n+k+1])/2
-                #Create new value that will be stored in row.
-                newValue = np.ceil((dataVals[n+k+1] + dataVals[n+k])/2)
-                #Add new time and values
-                dataTS = np.insert(dataTS, n+k+1, newTime)
-                dataVals = np.insert(dataVals, n+k+1, newValue)
-                #Increase index k                k+=1
+        #Define variable to keep track of size of dataVals (and dataTS) as it increases
+        i=0
+        #Check if the difference between consecutive times is 150 sec more arbitrarily
+        for n in range(len(dataTS)-1):
+            if (dataTS[n+i+1]-dataTS[n+i])//10**9 <= 150:
+                continue
+            #Define an average time and count value
+            avgTS = (dataTS[n+i+1]+dataTS[n+i])/2
+            avgVal = int((dataVals[n+i+1]+dataVals[n+i])/2)
+            #Insert avg time and count value inbetween the 
+            #two times which are more than 150 sec apart.
+            dataTS = np.insert(dataTS, n+i+1, avgTS)
+            dataVals = np.insert(dataVals, n+i+1, avgVal)
+            i+=1
         #Resize dataframe to fit in new size collumns.
         data = pd.concat([data, pd.DataFrame([{}]*(len(dataVals)-len(data.index)))], ignore_index=True)
         #Update count collumn
@@ -141,28 +138,28 @@ class preProcessing():
         """Calls all functions related to preProcessing for the document and outputs result in a csv file.
         Do not change the order of the calls. Preprocessing may break as
         a result."""
-        #incompleteCountFix also goes before resetFix as 
-        #resetfix messes with the orders of the glitched numbers.
+        #Call doubleDateFix before incompleteCount preferably as leads to
+        #faster compilation time.
+        data=preProcessing.doubleDateFix(data)
+        #Call incompleteCountFix before resetFix as resetFix
+        #checks for 0 values which may not be resets and could be
+        #the end of a glitched number if incompleteCountFix
+        #is not called first.
         data=preProcessing.incompleteCountFix(data)
-        #Reset fix goes before order fix as
-        #order fix requires that numbers
-        #are ordered properly too which is not the case
-        #if resets occur.
         data=preProcessing.resetFix(data)
-        #Flutter and missingLineFix go after orderFix
-        #as then the detection for lines
-        #w >2 min interval inbetween and for 
-        #lines w +8 increase count in 2 minutes will be better.
-        data=preProcessing.orderFix(data)
-        #Missinglinefix goes before flutterErrorFix as we need to
-        #ensure that there are recordings every 2 min
-        #If there are not then flutterError fix may add 8 counts
-        #Even though it is an interval of 4 min apart and not 2
-        data=preProcessing.missingLineFix(data)
-        #FlutterErrorFix goes last
+        #Missinglinefix can be called anywhere before flutterErrorFix
+        #as flutterError fix may take the count difference between dates
+        #more than 2 min apart if missingLineFix is not called before
+        #Additionally should be called after doubledateFix as missingLineFix
+        #checks the difference between consecutive times which can be
+        #messed up if double dates (which are out of time order) are not removed.
+        data=preProcessing.missingLineFix(data)   
+        #flutterErrorFix should be called last as it uses differences between
+        #consecutive counts.
         data=preProcessing.flutterErrorFix(data)
         data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
         return data
+
 
 birds = preProcessing.process(birds)
 print(birds)
