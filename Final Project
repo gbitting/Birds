@@ -100,13 +100,14 @@ class preProcessing():
             if (dataTS[n+i+1]-dataTS[n+i])//10**9 <= 150:
                 continue
             #Define an average time and count value
-            avgTS = (dataTS[n+i+1]+dataTS[n+i])/2
-            avgVal = int((dataVals[n+i+1]+dataVals[n+i])/2)
+            avgTS = (dataTS[n+i+1]-dataTS[n+i])/(1+(dataTS[n+i+1]-dataTS[n+i])//(150*10**9))
+            avgVal = np.floor(dataVals[n+i+1]-dataVals[n+i])/(1+(dataTS[n+i+1]-dataTS[n+i])//(150*10**9))
             #Insert avg time and count value inbetween the 
             #two times which are more than 150 sec apart.
-            dataTS = np.insert(dataTS, n+i+1, avgTS)
-            dataVals = np.insert(dataVals, n+i+1, avgVal)
-            i+=1
+            for k in range(1, ((dataTS[n+i+1]-dataTS[n+i])//(150*10**9))+1):
+                dataTS = np.insert(dataTS, n+i+1, dataTS[n+i]+avgTS)
+                dataVals = np.insert(dataVals, n+i+1, dataVals[n+i]+avgVal)
+                i+=1
         #Resize dataframe to fit in new size collumns.
         data = pd.concat([data, pd.DataFrame([{}]*(len(dataVals)-len(data.index)))], ignore_index=True)
         #Update count collumn
@@ -157,7 +158,7 @@ class preProcessing():
         #flutterErrorFix should be called last as it uses differences between
         #consecutive counts.
         data=preProcessing.flutterErrorFix(data)
-        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8", header = False)
+        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
         return data
 
 
