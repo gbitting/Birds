@@ -39,7 +39,6 @@ class preProcessing():
                     #Otherwise it is a reset so continue
                     else:
                         continue
-                    print("no", n)
                 #Check that the end of the next value is equal to 
                 #the end of the current value (signifies incomplete count)
                 if dataVals[n]-(dataVals[n]//(10**np.floor(np.log10(dataVals[n+1])+1)))*10**np.floor(np.log10(dataVals[n+1])+1) == dataVals[n+1]:
