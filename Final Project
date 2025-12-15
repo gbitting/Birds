@@ -148,9 +148,18 @@ class preProcessing():
         #are ordered properly too which is not the case
         #if resets occur.
         data=preProcessing.resetFix(data)
+        #Flutter and missingLineFix go after orderFix
+        #as then the detection for lines
+        #w >2 min interval inbetween and for 
+        #lines w +8 increase count in 2 minutes will be better.
         data=preProcessing.orderFix(data)
-        data=preProcessing.flutterErrorFix(data)
+        #Missinglinefix goes before flutterErrorFix as we need to
+        #ensure that there are recordings every 2 min
+        #If there are not then flutterError fix may add 8 counts
+        #Even though it is an interval of 4 min apart and not 2
         data=preProcessing.missingLineFix(data)
+        #FlutterErrorFix goes last
+        data=preProcessing.flutterErrorFix(data)
         data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
         return data
 
