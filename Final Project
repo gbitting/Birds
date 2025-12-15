@@ -21,33 +21,34 @@ class preProcessing():
         """Deals with incomplete counts by adding the snipped off parts
         back to the numbers."""
         dataVals = data.iloc[:, 0].to_numpy()
-        for n in range(len(dataVals)-1):
-            #Check that previous value is smaller than next
-            #and that the next next is bigger or equal to the previous
-            #in order to prevent picking up a reset
-            if(dataVals[n] > dataVals[n+1] and dataVals[n+2]>=dataVals[n]):
-                #Check for 0 case as below strategy doesn't work then
-                if(dataVals[n+1]==0):
-                    #If glitched number is 0 then the real number neighboring
-                    #it should be divisible by 10
-                    if(dataVals[n]%10==0):
+        for n in range(len(dataVals)-2):
+            #Check that current value doesn't equal to next
+            if(dataVals[n] != dataVals[n+1]):
+                #Check for case that dataVals[n+1]==0 because then its log
+                #is undefined.
+                if dataVals[n+1]==0:
+                    #The incomplete count is always the end of 
+                    #a complete number thus dataVals[n+2] or dataVals[n],
+                    #which has the complete number, is divisible by 10
+                    if dataVals[n] % 10 == 0:
                         dataVals[n+1]=dataVals[n]
                         continue
-                    if(dataVals[n+2]%10==0):
+                    if dataVals[n+2] %10 == 0:
                         dataVals[n+1]=dataVals[n+2]
                         continue
+                    #Otherwise it is a reset so continue
                     else:
                         continue
-                #Get order of glitched number
-                orderGlitched = int(np.floor(np.log10(dataVals[n+1])))
-                #Create a new num.
-                newNum=0
-                #Strip the n'th number of the parts that the
-                #n+1th number is not missing and add resulting number to newNum
-                newNum+=(dataVals[n]//(10**(orderGlitched+1)))*(10**(orderGlitched+1))
-                #Add the n+1th number to newnum to complete the number
-                newNum+=dataVals[n+1]
-                dataVals[n+1]=newNum
+                    print("no", n)
+                #Check that the end of the next value is equal to 
+                #the end of the current value (signifies incomplete count)
+                if dataVals[n]-(dataVals[n]//(10**np.floor(np.log10(dataVals[n+1])+1)))*10**np.floor(np.log10(dataVals[n+1])+1) == dataVals[n+1]:
+                    dataVals[n+1]=dataVals[n]
+        #Check first and last numbers since for loop does not account for them.
+        if dataVals[0]==dataVals[1]-(dataVals[1]//(10**np.floor(np.log10(dataVals[0])+1)))*10**np.floor(np.log10(dataVals[0])+1):
+            dataVals[0]==dataVals[1]
+        if dataVals[-1]==dataVals[-2]-(dataVals[-2]//(10**np.floor(np.log10(dataVals[-1])+1)))*10**np.floor(np.log10(dataVals[-1])+1):
+            dataVals[-1]==dataVals[-2]    
         data["count"] = dataVals
         return data
         
@@ -140,11 +141,13 @@ class preProcessing():
         """Calls all functions related to preProcessing for the document and outputs result in a csv file.
         Do not change the order of the calls. Preprocessing may break as
         a result."""
-        #IncompleteCountFix should always be called first
-        #as it relies on the fact that an incomplete number
-        #will be of, at least, one order less than it's complete
-        #neighbors. If resets are fixed first this is not the case
+        #incompleteCountFix also goes before resetFix as 
+        #resetfix messes with the orders of the glitched numbers.
         data=preProcessing.incompleteCountFix(data)
+        #Reset fix goes before order fix as
+        #order fix requires that numbers
+        #are ordered properly too which is not the case
+        #if resets occur.
         data=preProcessing.resetFix(data)
         data=preProcessing.orderFix(data)
         data=preProcessing.flutterErrorFix(data)
