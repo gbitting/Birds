@@ -156,9 +156,32 @@ class preProcessing():
         #flutterErrorFix should be called last as it uses differences between
         #consecutive counts.
         data=preProcessing.flutterErrorFix(data)
-        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8")
+        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8", header = False)
         return data
 
 
 birds = preProcessing.process(birds)
 print(birds)
+
+# 4
+
+df = pd.read_csv('ProcessedBirdData.csv', sep="\t", names=["date_time", "count"])
+
+df["date_time"] = pd.to_datetime(df["date_time"], format = "mixed")
+df["count"] = pd.to_numeric(df["count"])
+
+
+start_date = pd.to_datetime(input("Enter start date: ")).tz_localize("Europe/Stockholm")
+days = int(input("Enter number of days: "))
+interval = pd.Timedelta(input('Enter inerval between readings (value and unit): '))
+
+
+end_date = start_date + pd.Timedelta(days=days)
+
+df = df[(df["date_time"] >= start_date)&(df["date_time"] < end_date)]
+
+df["count"] = df["count"].diff()
+
+df = df.set_index("date_time")
+
+resampled_df = df.resample(interval).sum().reset_index()
