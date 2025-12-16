@@ -183,9 +183,14 @@ df = df.dropna(subset=["count"])
 
 start_date = pd.to_datetime(input("Enter start date (YYYY-MM-DD): ")).tz_localize("Europe/Stockholm")
 days = int(input("Enter number of days: "))
-interval = input('Enter interval between readings (value and unit (m, d, h, min)): ').strip()
+interval = input('Enter interval between readings (value and unit): ').strip()
 
-def extract_data(start_date,days,interval, df):
+def extract_data(start_date: pd.Timestamp,days: int,interval: str, df: pd.DataFrame()):
+    
+    """
+    Plots bird counts with optional sunrise/sunset shading.
+    
+    """
     end_date = start_date + pd.Timedelta(days=days)
 
     df = df[(df["date_time"] >= start_date)&(df["date_time"] < end_date)]
@@ -241,7 +246,6 @@ fig, ax = plt.subplots(figsize=(12,6))
 ax.bar(resampled_df["date_time"], resampled_df["count"], width = 0.04)
 
 ax.set_xticks(resampled_df["date_time"])
-ax.set_xticklabels(resampled_df["date_time"].dt.strftime("%H:%M"), rotation=45)
 
 ax.set_xticklabels(
     [
@@ -285,7 +289,7 @@ for d in dates:
     sunset = s["sunset"]
     ax.axvspan( sunrise, sunset, color="yellow", alpha = 0.25, zorder = 0)
     
-    ax.axvline(sunrise, color='red', alpha=0.4, linestyle='--', label ='sunrise' if first_day else None)
+    ax.axvline(sunrise, color='red', alpha=0.4, linestyle='--', label ='sunset' if first_day else None)
     ax.axvline(sunset, color='orange', alpha=0.4, linestyle='--', label = 'sunset' if first_day else None)
     first_day = False
     
