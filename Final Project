@@ -6,7 +6,7 @@ from astral.sun import sun
 from astral import LocationInfo
 
 # 1
-data = pd.read_csv("bird_jan25jan16.txt", sep=r"\s+", engine = 'python', parse_dates=[[0, 1]], names = ['date', 'time', 'count'])
+data = pd.read_csv("bird_jan25jan16.txt", sep = r"\s+", engine = 'python', parse_dates = [[0, 1]], names = ['date', 'time', 'count'])
 birds = pd.DataFrame(data)
 
 # 2
