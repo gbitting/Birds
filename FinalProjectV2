@@ -245,15 +245,9 @@ fig, ax = plt.subplots(figsize=(12,6))
 
 ax.bar(resampled_df["date_time"], resampled_df["count"], width = 0.04)
 
-ax.set_xticks(resampled_df["date_time"])
-
-ax.set_xticklabels(
-    [
-     dt.strftime("%H") if dt.hour % 3 == 0 else "" for dt in resampled_df['date_time']
-     ],
-    rotation=45)
-
-unique_dates = resampled_df['date_time'].dt.date.unique()
+ax.xaxis.set_major_locator(mdates.HourLocator(byhour=range(0, 24, 3)))
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%H") )
+fig.autofmt_xdate(rotation=45)
 
 
 midnight_mask = ~resampled_df["date_time"].dt.floor('D').duplicated()
@@ -262,9 +256,7 @@ midnight_positions = resampled_df["date_time"][midnight_mask]
 sec = ax.secondary_xaxis('bottom')
 sec.set_xticks(midnight_positions)
 sec.set_xticklabels(midnight_positions.dt.date)
-sec.tick_params(length=0, pad=30)
-
-
+sec.tick_params(length=10, pad=30)
 
 
 # ---- Task 6 Sun Motions ---- #
