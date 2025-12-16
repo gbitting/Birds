@@ -176,7 +176,7 @@ df["count"] = pd.to_numeric(df["count"])
 
 start_date = pd.to_datetime(input("Enter start date: ")).tz_localize("Europe/Stockholm")
 days = int(input("Enter number of days: "))
-interval = pd.Timedelta(input('Enter inerval between readings (value and unit): '))
+interval = pd.Timedelta(input('Enter interval between readings (value and unit): '))
 
 
 end_date = start_date + pd.Timedelta(days=days)
