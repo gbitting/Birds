@@ -285,7 +285,7 @@ for d in dates:
     sunset = s["sunset"]
     ax.axvspan( sunrise, sunset, color="yellow", alpha = 0.25, zorder = 0)
     
-    ax.axvline(sunrise, color='red', alpha=0.4, linestyle='--', label ='sunset' if first_day else None)
+    ax.axvline(sunrise, color='red', alpha=0.4, linestyle='--', label ='sunrise' if first_day else None)
     ax.axvline(sunset, color='orange', alpha=0.4, linestyle='--', label = 'sunset' if first_day else None)
     first_day = False
     
