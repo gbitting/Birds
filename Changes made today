@@ -1,0 +1,104 @@
+import pandas as pd
+import numpy as np
+import pytz
+import matplotlib.pyplot as plt
+from astral.sun import sun
+from astral import LocationInfo
+
+
+# 4
+
+df = pd.read_csv('ProcessedBirdData.csv', sep="\t", names=["date_time", "count"], dtype=str)
+
+df["date_time"] = pd.to_datetime(df["date_time"], errors = 'coerce', utc=True)
+df = df.dropna(subset=["date_time"])
+df["date_time"] = df["date_time"].dt.tz_convert("Europe/Stockholm")
+
+
+
+
+df["count"] = pd.to_numeric(df["count"])
+df = df.dropna(subset=["count"])
+
+start_date = pd.to_datetime(input("Enter start date: ")).tz_localize("Europe/Stockholm")
+days = int(input("Enter number of days: "))
+interval = input('Enter interval between readings (value and unit): ').strip()
+
+
+end_date = start_date + pd.Timedelta(days=days)
+
+df = df[(df["date_time"] >= start_date)&(df["date_time"] < end_date)]
+
+df["count"] = df["count"].diff().shift(periods=-1)
+df = df.dropna()
+df = df.set_index("date_time")
+
+
+
+resampled_df = df.resample(interval).sum().reset_index()
+
+
+
+
+
+
+
+
+fig, ax = plt.subplots(figsize=(12,6))
+
+# Bars with datetime x-axis
+ax.plot(resampled_df["date_time"], resampled_df["count"])# , width=10) # 0.03
+
+ax.set_xticks(resampled_df["date_time"])
+ax.set_xticklabels(resampled_df["date_time"].dt.strftime("%H:%M"), rotation=45)
+
+ax.set_xticklabels(
+    [f"{h:02d}:00" for h in resampled_df["date_time"].dt.hour],
+    rotation=45)
+
+unique_dates = resampled_df['date_time'].dt.date.unique()
+
+
+midnight_mask = ~resampled_df["date_time"].dt.hour.eq(0)
+midnight_positions = resampled_df["date_time"][midnight_mask]
+
+sec = ax.secondary_xaxis('bottom')
+sec.set_xticks(midnight_positions)
+sec.set_xticklabels(midnight_positions.dt.date)
+sec.tick_params(length=0, pad=30)
+
+
+# 6
+
+#                       City             Region     Timezone         Longitude + Latitude 
+Location = LocationInfo("Södra Sandby", "Sweden", "Europe/Stockholm", 55.6985, 13.3542)
+
+tz = pytz.timezone(Location.timezone) # sets the timezone to Stockholm's
+
+end_date = start_date + pd.Timedelta(days = days) # finds the end date by 
+#                                     adding the number of days from the 
+#                               input to the date from the input
+
+times = pd.date_range(start=start_date, end=end_date, freq=interval, tz="Europe/Stockholm", inclusive = "left")
+#           Gets the date, time and time interval from the input before. 
+#           Inclusive = left includes the start date in the range but not the end date.
+
+dates = pd.to_datetime(times.date).unique()
+# Extracts only the date and converts it into datetime objects
+# .unique returns the unique dates without any duplicates
+
+for d in dates:
+    s = sun(Location.observer, date = d, tzinfo = tz)
+    sunrise = s["sunrise"]
+    sunset = s["sunset"]
+    ax.axvspan( sunrise, sunset, color="yellow", alpha = 0.25, zorder = 0)
+# Extracts the times of sunrise and sunset over the given time period
+# then shades vertical areas behind the graph with yellow to indicate 
+# the daylight hours in those days
+#                                                     zorder = 0 to draw
+#                                                     behind the bars
+
+ax.set_xlabel("Time")
+ax.set_ylabel("Bird count")
+plt.tight_layout()
+plt.show()
