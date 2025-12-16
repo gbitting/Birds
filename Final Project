@@ -213,7 +213,7 @@ sec.set_xticklabels(midnight_positions.dt.date)
 sec.tick_params(length=0, pad=30)
 
 
-# 5
+# 6
 
 #                       City             Region     Timezone         Longitude + Latitude 
 Location = LocationInfo("Södra Sandby", "Sweden", "Europe/Stockholm", 55.6985, 13.3542)
