@@ -183,7 +183,7 @@ df = df.dropna(subset=["count"])
 
 start_date = pd.to_datetime(input("Enter start date (YYYY-MM-DD): ")).tz_localize("Europe/Stockholm")
 days = int(input("Enter number of days: "))
-interval = input('Enter interval between readings (value and unit): ').strip()
+interval = input('Enter interval between readings (value and unit (m, d, h, min)): ').strip()
 
 def extract_data(start_date,days,interval, df):
     end_date = start_date + pd.Timedelta(days=days)
