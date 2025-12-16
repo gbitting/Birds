@@ -1,0 +1,304 @@
+import pandas as pd
+import numpy as np
+import pytz
+import matplotlib.pyplot as plt
+from astral.sun import sun
+from astral import LocationInfo
+import matplotlib.dates as mdates
+
+
+# ---- Task 1 ---- #
+data = pd.read_csv("bird_jan25jan16.txt", sep = r"\s+", engine = 'python', parse_dates = [[0, 1]], names = ['date', 'time', 'count'])
+birds = pd.DataFrame(data)
+
+# ---- Task 2 ---- $
+birds['date_time'] = birds['date_time'].dt.tz_localize('UTC')
+birds['date_time'] = birds['date_time'].dt.tz_convert('Europe/Stockholm')
+
+birds = birds.set_index('date_time')
+
+# ---- Task 3 ---- #
+class preProcessing():     
+
+    @staticmethod
+    def doubleDateFix(data):
+        """Some dates are double and out of order. This function removes these dates."""
+        #Convert time to int. (Gives time in ns since 1970)
+        dataTS = data.index.astype("int64")
+        dataVals = data.iloc[:, 0].to_numpy()
+        #New variable to offset dataTS and dataVals
+        k=0
+        #Check for dates out of place
+        for n in range(1, len(dataTS)-1):
+            if dataTS[n-k] < dataTS[n-k-1] or dataTS[n-k]>dataTS[n-k+1]:
+                #Remove out of place dates and their counts.
+                dataTS = np.delete(dataTS, n-k)
+                dataVals = np.delete(dataVals, n-k)
+                k+=1
+        #Convert dataTS back to datetime
+        dataTS = pd.to_datetime(dataTS)
+        dataTS=dataTS.tz_localize('UTC')
+        dataTS=dataTS.tz_convert('Europe/Stockholm')
+        #Create new pandas dataframe with new collumns.
+        data = pd.DataFrame(data={'count':dataVals, 'date_time':dataTS})
+        data = data.set_index('date_time')
+        return data    
+
+    @staticmethod
+    def incompleteCountFix(data):
+        """Deals with incomplete counts by replacing them with their full counterpart."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        #Convert dataVals numbers to string
+        dataVals = np.char.mod('%s', dataVals)
+        for n in range(len(dataVals)-2):
+            if len(dataVals[n]) > len(dataVals[n+1]):
+                #Check if the number is equal to its neighbors end
+                if(dataVals[n][len(dataVals[n])-len(dataVals[n+1]):] == dataVals[n+1]):
+                    dataVals[n+1]=dataVals[n]
+                    continue
+                if(dataVals[n+2][len(dataVals[n+2])-len(dataVals[n+1]):]==dataVals[n+1]):
+                    dataVals[n+1]=dataVals[n+2]
+                    continue
+                #Check if the number is equal to it's neighbors beginning
+                if dataVals[n+1] == dataVals[n][:len(dataVals[n+1])]:
+                    dataVals[n+1]=dataVals[n]
+                    continue
+                if dataVals[n+1] == dataVals[n+2][:len(dataVals[n+1])]:
+                    dataVals[n+1]=dataVals[n+2]
+                    continue
+                #If none of these are true then it must be a reset so continue.
+                else:
+                    continue
+        dataVals = dataVals.astype(int)
+        data["count"] = dataVals
+        return data
+        
+    @staticmethod
+    def resetFix(data):
+        """Deals with count resets by adding the number before the reset to
+        all the following numbers."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        for n in range(1, len(dataVals)-1):
+            #Check if a value is 0 if so => reset
+            #if value previous also 0 then adding it does nothing
+            if(dataVals[-n-1]==0):
+                #Add the previous count to all of the elements after
+                dataVals[-n-1:] +=dataVals[-n-2]
+        data["count"] = dataVals
+        return data
+    
+        
+    @staticmethod
+    def missingLineFix(data):
+        """Fixes missing lines by adding lines inbetween s.t. there are shorter than
+        2 min and 30 seconds intervals between the first and the previously next line."""
+        #Convert time to int. (Gives time in ns since 1970)
+        dataTS = data.index.astype("int64")
+        dataTS = dataTS.to_numpy()
+        dataVals = data.iloc[:, 0].to_numpy()
+        #Define variable to keep track of size of dataVals (and dataTS) as it increases
+        i=0
+        #Check if the difference between consecutive times is 150 sec more arbitrarily
+        for n in range(len(dataTS)-1):
+            if (dataTS[n+i+1]-dataTS[n+i])//10**9 <= 150:
+                continue
+            #Define an average time and count value
+            avgTS = (dataTS[n+i+1]-dataTS[n+i])/(1+(dataTS[n+i+1]-dataTS[n+i])//(150*10**9))
+            avgVal = np.floor(dataVals[n+i+1]-dataVals[n+i])/(1+(dataTS[n+i+1]-dataTS[n+i])//(150*10**9))
+            #Insert avg time and count value inbetween the 
+            #two times which are more than 150 sec apart.
+            for k in range(1, ((dataTS[n+i+1]-dataTS[n+i])//(150*10**9))+1):
+                dataTS = np.insert(dataTS, n+i+1, dataTS[n+i]+avgTS)
+                dataVals = np.insert(dataVals, n+i+1, dataVals[n+i]+avgVal)
+                i+=1
+        #Resize dataframe to fit in new size collumns.
+        data = pd.concat([data, pd.DataFrame([{}]*(len(dataVals)-len(data.index)))], ignore_index=True)
+        #Update count collumn
+        data["count"] = dataVals
+        #Translate dataTS into timestamps in our region
+        dataTS = pd.to_datetime(dataTS)
+        dataTS=dataTS.tz_localize('UTC')
+        dataTS=dataTS.tz_convert('Europe/Stockholm')
+        #Update time collumn
+        data.index = (dataTS)
+        return data
+    
+    @staticmethod
+    def flutterErrorFix(data):
+        """Deals with error from birds fluttering by the box by
+        limiting counts to approx 8 per 2 minute."""
+        dataVals = data.iloc[:, 0].to_numpy()
+        for n in range(len(dataVals)-1):
+            #Check for more than 8 counts in less than 2 min
+            if(dataVals[n+1]-dataVals[n] > 8):
+                #Add offset to take care of extra counts and add in 8
+                #counts for all elements of index n+1 or higher.
+                dataVals[n+1:]+=-(dataVals[n+1]-dataVals[n])+8
+        data["count"] = dataVals
+        return data
+            
+    @staticmethod
+    def process(data):
+        """Calls all functions related to preProcessing for the document and outputs result in a csv file.
+        Do not change the order of the calls. Preprocessing may break as
+        a result."""
+        #Call doubleDateFix before incompleteCount preferably as leads to
+        #faster compilation time.
+        data=preProcessing.doubleDateFix(data)
+        #Call incompleteCountFix before resetFix as resetFix
+        #checks for 0 values which may not be resets and could be
+        #the end of a glitched number if incompleteCountFix
+        #is not called first.
+        data=preProcessing.incompleteCountFix(data)
+        data=preProcessing.resetFix(data)
+        #Missinglinefix can be called anywhere before flutterErrorFix
+        #as flutterError fix may take the count difference between dates
+        #more than 2 min apart if missingLineFix is not called before
+        #Additionally should be called after doubledateFix as missingLineFix
+        #checks the difference between consecutive times which can be
+        #messed up if double dates (which are out of time order) are not removed.
+        data=preProcessing.missingLineFix(data)   
+        #flutterErrorFix should be called last as it uses differences between
+        #consecutive counts.
+        data=preProcessing.flutterErrorFix(data)
+        data.to_csv("ProcessedBirdData.csv", sep="\t", encoding="utf-8", header = False)
+        return data
+
+
+birds = preProcessing.process(birds)
+print(birds)
+
+
+# ---- Task 4 ---- #
+
+df = pd.read_csv('ProcessedBirdData.csv', sep="\t", names=["date_time", "count"], dtype=str)
+
+df["date_time"] = pd.to_datetime(df["date_time"], errors = 'coerce', utc=True)
+df = df.dropna(subset=["date_time"])
+df["date_time"] = df["date_time"].dt.tz_convert("Europe/Stockholm")
+
+
+df["count"] = pd.to_numeric(df["count"])
+df = df.dropna(subset=["count"])
+
+start_date = pd.to_datetime(input("Enter start date (YYYY-MM-DD): ")).tz_localize("Europe/Stockholm")
+days = int(input("Enter number of days: "))
+interval = input('Enter interval between readings (value and unit): ').strip()
+
+def extract_data(start_date,days,interval, df):
+    end_date = start_date + pd.Timedelta(days=days)
+
+    df = df[(df["date_time"] >= start_date)&(df["date_time"] < end_date)]
+
+    df["count"] = df["count"].diff().shift(periods=-1)
+    df = df.dropna()
+    df = df.set_index("date_time")
+
+    resampled_df = df.resample(interval).sum().reset_index()
+    
+    return resampled_df, end_date
+
+
+
+# ---- Task 5 Plotting ---- #
+
+# Year-round Plot
+
+first_day_yr = pd.Timestamp("2015-01-25", tz="Europe/Stockholm")
+
+resampled_df_yearly, end_date = extract_data(
+    first_day_yr,
+    340,
+    "12H",
+    df
+)
+
+fig, ax = plt.subplots(figsize=(12,6))
+
+ax.plot(resampled_df_yearly["date_time"], resampled_df_yearly["count"])
+
+
+ax.xaxis.set_major_locator(mdates.MonthLocator()) 
+ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+
+ax.set_xlabel("Time")
+ax.set_ylabel("Bird Movements")
+ax.set_title(f"Bird Movements between {first_day_yr.date()} and {end_date.date()}",
+    fontweight="bold")
+
+ax.grid(linestyle='--', alpha=0.4)
+
+plt.tight_layout()
+plt.show()
+
+
+# Daily/Hourly Plot
+
+resampled_df, end_date = extract_data(start_date, days, interval, df)
+
+fig, ax = plt.subplots(figsize=(12,6))
+
+ax.bar(resampled_df["date_time"], resampled_df["count"], width = 0.04)
+
+ax.set_xticks(resampled_df["date_time"])
+ax.set_xticklabels(resampled_df["date_time"].dt.strftime("%H:%M"), rotation=45)
+
+ax.set_xticklabels(
+    [
+     dt.strftime("%H") if dt.hour % 3 == 0 else "" for dt in resampled_df['date_time']
+     ],
+    rotation=45)
+
+unique_dates = resampled_df['date_time'].dt.date.unique()
+
+
+midnight_mask = ~resampled_df["date_time"].dt.floor('D').duplicated()
+midnight_positions = resampled_df["date_time"][midnight_mask]
+
+sec = ax.secondary_xaxis('bottom')
+sec.set_xticks(midnight_positions)
+sec.set_xticklabels(midnight_positions.dt.date)
+sec.tick_params(length=0, pad=30)
+
+
+
+
+# ---- Task 6 Sun Motions ---- #
+
+
+Location = LocationInfo("Södra Sandby", "Sweden", "Europe/Stockholm", 55.6985, 13.3542)
+
+tz = pytz.timezone(Location.timezone) # sets the timezone to Stockholm's
+
+end_date = start_date + pd.Timedelta(days = days) # finds the end date 
+
+times = pd.date_range(start=start_date, end=end_date, freq=interval, tz="Europe/Stockholm", inclusive = "left")
+
+
+dates = pd.to_datetime(times.date).unique()
+
+first_day = True
+
+for d in dates:
+    s = sun(Location.observer, date = d, tzinfo = tz)
+    sunrise = s["sunrise"]
+    sunset = s["sunset"]
+    ax.axvspan( sunrise, sunset, color="yellow", alpha = 0.25, zorder = 0)
+    
+    ax.axvline(sunrise, color='red', alpha=0.4, linestyle='--', label ='sunset' if first_day else None)
+    ax.axvline(sunset, color='orange', alpha=0.4, linestyle='--', label = 'sunset' if first_day else None)
+    first_day = False
+    
+
+
+ax.set_xlabel("Date and Time")
+ax.set_ylabel("Bird count")
+
+ax.set_title(f"Bird activity from {start_date.date()} to {end_date.date()}", fontweight='bold')
+
+plt.grid(linestyle='--', alpha=0.4)
+
+plt.legend()
+
+plt.tight_layout()
+plt.show()
